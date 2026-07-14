@@ -1,6 +1,6 @@
 extends RigidBody3D
 
-@export_group("Movement & Rotation")
+@export_group("Movement and Rotation")
 @export var move_speed: float = 0.8
 @export var rotate_speed: float = 1.2
 
@@ -9,10 +9,13 @@ extends RigidBody3D
 @export var charge_rate: float = 1.5
 @export var min_force: float = 0.2
 @export var max_pullback_distance: float = 0.8
+@export var contact_tolerance: float = 0.06
 
 var current_force: float = 0.0
 var is_charging: bool = false
 var strike_origin_pos: Vector3 = Vector3.ZERO
+var strike_origin_basis: Basis = Basis.IDENTITY
+@onready var cue_tip_shape: CollisionShape3D = $CollisionShape3D2
 
 func _ready() -> void:
 	axis_lock_angular_x = true
@@ -48,6 +51,7 @@ func _physics_process(delta: float) -> void:
 			is_charging = true
 			current_force = min_force
 			strike_origin_pos = global_position
+			strike_origin_basis = global_transform.basis
 		
 		if current_force < max_force:
 			current_force += charge_rate * delta
@@ -61,22 +65,44 @@ func _physics_process(delta: float) -> void:
 		is_charging = false
 
 func execute_strike() -> void:
-	freeze = true
-	set_cue_collisions(false)
+	var cue_ball: RigidBody3D = get_tree().get_first_node_in_group("cue_ball") as RigidBody3D
 
 	var charge_ratio = (current_force - min_force) / max(max_force - min_force, 0.001)
 	var forward_follow_through = 0.2 + (charge_ratio * 0.4)
-	var forward_dir: Vector3 = global_transform.basis.z.normalized()
-	var target_pos = strike_origin_pos + (forward_dir * forward_follow_through)
+	var forward_dir: Vector3 = strike_origin_basis.z.normalized()
+	var target_pos: Vector3 = strike_origin_pos + (forward_dir * forward_follow_through)
 	var stroke_duration = lerp(0.12, 0.05, charge_ratio)
+
+	var cue_tip_offset: Vector3 = strike_origin_basis * cue_tip_shape.position
+	var start_tip_position: Vector3 = global_position + cue_tip_offset
+	var end_tip_position: Vector3 = target_pos + cue_tip_offset
+
+	var can_hit_cue_ball: bool = false
+
+	if cue_ball != null:
+		var tip_path: Vector3 = end_tip_position - start_tip_position
+		var path_length_squared: float = tip_path.length_squared()
+		var closest_t: float = 0.0
+
+		if path_length_squared > 0.0:
+			closest_t = clampf(
+				(cue_ball.global_position - start_tip_position).dot(tip_path)
+				/ path_length_squared,
+				0.0,
+				1.0
+			)
+
+		var closest_point: Vector3 = start_tip_position + tip_path * closest_t
+		can_hit_cue_ball = closest_point.distance_to(cue_ball.global_position) <= contact_tolerance
+
+	freeze = true
+	set_cue_collisions(false)
 
 	var tween = create_tween()
 	tween.tween_property(self, "global_position", target_pos, stroke_duration)
 
 	tween.finished.connect(func() -> void:
-		var cue_ball: RigidBody3D = get_tree().get_first_node_in_group("cue_ball") as RigidBody3D
-
-		if cue_ball != null:
+		if can_hit_cue_ball and cue_ball != null:
 			var safe_force: float = min(current_force, 2.0)
 			cue_ball.apply_central_impulse(forward_dir * safe_force)
 
