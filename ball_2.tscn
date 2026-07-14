@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://dm2y4v6ny003o"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_i2ude"]
+radius = 1.0
+
+[node name="ball2" type="RigidBody3D" unique_id=509945450]
+collision_layer = 4
+collision_mask = 7
+mass = 0.165
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2005560677]
+transform = Transform3D(0.0285, 0, 0, 0, 0.0285, 0, 0, 0, 0.0285, 1.01923945e-08, 0, -1.01923945e-08)
+shape = SubResource("SphereShape3D_i2ude")

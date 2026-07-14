@@ -1,0 +1,4 @@
+[gd_scene format=3 uid="uid://jqsf8e2ivcs5"]
+
+[node name="Ball" type="RigidBody3D" unique_id=1192448222]
+mass = 0.165
